@@ -1,0 +1,4 @@
+interface:
+  display_name: "Houdini Tool Agency"
+  short_description: "Agency-style squad for Houdini AI tools"
+  default_prompt: "Use $houdini-tool-agency to build this Houdini AI tool like a coordinated product, tech, and artist squad."
