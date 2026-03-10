@@ -36,6 +36,12 @@ POLLEN_API_KEY=
 
 Without `POLLEN_API_KEY`, the app falls back to the local heuristic generator.
 
+You can also connect a Pollinations key directly in the browser:
+
+- `Connect with Pollinations` uses the OAuth redirect flow
+- manual key paste stores the key in local browser storage
+- connected state and balance are checked against Pollinations directly
+
 ## Behavior
 
 - `POST /api/generate` accepts `{ prompt }`

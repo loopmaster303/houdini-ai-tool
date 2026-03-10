@@ -1,6 +1,7 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
+import { PollenKeyPanel } from "@/components/PollenKeyPanel";
 import type { VexResult } from "@/lib/types";
 import { prettyClass, prettyLabel } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +76,10 @@ export function PromptPanel({
 
         <Separator />
 
+        <PollenKeyPanel />
+
+        <Separator />
+
         <div className="space-y-3">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">Generation meta</p>
           {result ? (
@@ -91,4 +96,3 @@ export function PromptPanel({
     </Card>
   );
 }
-

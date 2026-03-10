@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { generateHeuristicResult } from "@/lib/heuristic";
 import { normalizeModelResult } from "@/lib/normalize";
 import { callPollinations } from "@/lib/pollinations";
+import { resolvePollenKey } from "@/lib/resolve-pollen-key";
 
 export async function POST(request: Request) {
   try {
@@ -12,17 +13,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Prompt is required." }, { status: 400 });
     }
 
-    if (!process.env.POLLEN_API_KEY) {
+    const apiKey = resolvePollenKey(request);
+
+    if (!apiKey) {
       return NextResponse.json(
         generateHeuristicResult(
           prompt,
-          "No POLLEN_API_KEY found, so the app is using the local heuristic generator."
+          "No Pollinations key is connected, so the app is using the local heuristic generator."
         )
       );
     }
 
     try {
-      const raw = await callPollinations(prompt);
+      const raw = await callPollinations(prompt, apiKey);
       return NextResponse.json(normalizeModelResult(raw, prompt));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown model error.";
@@ -38,4 +41,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
-

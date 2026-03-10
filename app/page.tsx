@@ -6,6 +6,7 @@ import { CodePanel } from "@/components/CodePanel";
 import { ExplanationPanel } from "@/components/ExplanationPanel";
 import { ParamsPanel } from "@/components/ParamsPanel";
 import { PromptPanel } from "@/components/PromptPanel";
+import { getPollenHeaders } from "@/lib/pollen-key";
 import type { ParamMap, ParameterValue, VexResult } from "@/lib/types";
 import { getDefaultParamMap } from "@/lib/utils";
 
@@ -37,6 +38,7 @@ export default function HomePage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...getPollenHeaders(),
         },
         body: JSON.stringify({ prompt: activePrompt }),
       });

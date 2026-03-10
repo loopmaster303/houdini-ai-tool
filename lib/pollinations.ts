@@ -54,11 +54,9 @@ async function getSystemPrompt() {
   return cachedSystemPrompt;
 }
 
-export async function callPollinations(prompt: string) {
-  const apiKey = process.env.POLLEN_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("Missing POLLEN_API_KEY.");
+export async function callPollinations(prompt: string, apiKey: string) {
+  if (!apiKey.trim()) {
+    throw new Error("Missing Pollinations API key.");
   }
 
   const systemPrompt = await getSystemPrompt();
@@ -95,4 +93,3 @@ export async function callPollinations(prompt: string) {
 
   return extractJsonObject(content);
 }
-
