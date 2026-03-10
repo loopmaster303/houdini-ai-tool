@@ -6,8 +6,8 @@ Core loop:
 
 - prompt in
 - Pollinations model chain or local heuristic fallback
-- Houdini-ready VEX out
-- extracted artist controls as sliders
+- Houdini-ready VEX or Houdini-focused analysis out
+- extracted artist controls as sliders when the task is code generation
 
 ## Stack
 
@@ -54,10 +54,16 @@ You can also connect a Pollinations key directly in the browser:
 
 ## Behavior
 
-- `POST /api/generate` accepts `{ prompt }`
+- `POST /api/generate` accepts `{ prompt, context, mode, preferredModel }`
 - model output is normalized into a typed `VexResult`
 - slider changes update only the VEX header comment
 - copied code is ready to paste into a Houdini Attribute Wrangle
+
+Current task modes:
+
+- `Build` for VEX generation
+- `Explain` for network/dataflow interpretation from pasted context
+- `Debug` for likely-cause diagnosis from pasted context and errors
 
 ## Notes
 

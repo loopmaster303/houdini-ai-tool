@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { buildModelChain } from "@/lib/model-options";
+import type { TaskMode } from "@/lib/types";
 
 function extractMessageText(content: unknown) {
   if (typeof content === "string") {
@@ -55,7 +56,7 @@ async function getSystemPrompt() {
   return cachedSystemPrompt;
 }
 
-async function requestModel(prompt: string, apiKey: string, model: string) {
+async function requestModel(prompt: string, context: string, mode: TaskMode, apiKey: string, model: string) {
   const systemPrompt = await getSystemPrompt();
   const response = await fetch("https://gen.pollinations.ai/v1/chat/completions", {
     method: "POST",
@@ -67,7 +68,14 @@ async function requestModel(prompt: string, apiKey: string, model: string) {
       model,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: prompt },
+        {
+          role: "user",
+          content: [
+            `TASK MODE: ${mode}`,
+            `USER PROMPT:\n${prompt}`,
+            context.trim() ? `HOUDINI CONTEXT:\n${context.trim()}` : "HOUDINI CONTEXT:\n(none supplied)",
+          ].join("\n\n"),
+        },
       ],
       max_tokens: 2000,
     }),
@@ -90,10 +98,13 @@ async function requestModel(prompt: string, apiKey: string, model: string) {
     throw new Error(`Pollinations returned an empty message for ${model}.`);
   }
 
-  return extractJsonObject(content);
+  return {
+    raw: extractJsonObject(content),
+    modelUsed: model,
+  };
 }
 
-export async function callPollinations(prompt: string, apiKey: string, preferredModel?: string) {
+export async function callPollinations(prompt: string, context: string, mode: TaskMode, apiKey: string, preferredModel?: string) {
   if (!apiKey.trim()) {
     throw new Error("Missing Pollinations API key.");
   }
@@ -103,7 +114,7 @@ export async function callPollinations(prompt: string, apiKey: string, preferred
 
   for (const model of models) {
     try {
-      return await requestModel(prompt, apiKey, model);
+      return await requestModel(prompt, context, mode, apiKey, model);
     } catch (error) {
       const message = error instanceof Error ? error.message : `Unknown failure for ${model}.`;
       const status = error instanceof Error && "status" in error ? Number((error as Error & { status?: number }).status) : undefined;

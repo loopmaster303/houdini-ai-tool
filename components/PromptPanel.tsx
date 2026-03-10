@@ -3,8 +3,8 @@
 import { Sparkles } from "lucide-react";
 import { PollenKeyPanel } from "@/components/PollenKeyPanel";
 import { DEFAULT_MODEL_ID, RECOMMENDED_MODEL_OPTIONS } from "@/lib/model-options";
-import type { VexResult } from "@/lib/types";
-import { prettyClass, prettyLabel } from "@/lib/utils";
+import type { TaskMode, VexResult } from "@/lib/types";
+import { prettyClass, prettyLabel, prettyMode } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,10 +12,17 @@ import { Separator } from "@/components/ui/separator";
 
 interface PromptPanelProps {
   prompt: string;
+  contextText: string;
+  selectedMode: TaskMode;
   loading: boolean;
   result: VexResult | null;
   examples: string[];
+  promptPlaceholder: string;
+  contextPlaceholder: string;
   selectedModel: string;
+  onContextChange: (value: string) => void;
+  onLoadSampleContext: () => void;
+  onModeChange: (value: TaskMode) => void;
   onModelChange: (value: string) => void;
   onPromptChange: (value: string) => void;
   onSubmit: () => void;
@@ -24,10 +31,17 @@ interface PromptPanelProps {
 
 export function PromptPanel({
   prompt,
+  contextText,
+  selectedMode,
   loading,
   result,
   examples,
+  promptPlaceholder,
+  contextPlaceholder,
   selectedModel,
+  onContextChange,
+  onLoadSampleContext,
+  onModeChange,
   onModelChange,
   onPromptChange,
   onSubmit,
@@ -64,9 +78,55 @@ export function PromptPanel({
           }}
           rows={4}
           spellCheck={false}
-          placeholder="Build me a point wrangle that creates an organic mask over the surface using height and noise..."
+          placeholder={promptPlaceholder}
           className="min-h-44 w-full resize-none rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none ring-0 placeholder:text-zinc-500 focus:border-accent/50"
         />
+
+        <div className="space-y-3">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">Task mode</p>
+          <div className="flex flex-wrap gap-2">
+            {(["build", "explain", "debug"] as TaskMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => onModeChange(mode)}
+                className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                  selectedMode === mode
+                    ? "border-accent/40 bg-accent/10 text-accent"
+                    : "border-zinc-700 text-zinc-300 hover:border-accent/30 hover:bg-zinc-800"
+                }`}
+              >
+                {prettyMode(mode)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">Houdini context</p>
+            <div className="flex items-center gap-3">
+              {(selectedMode === "explain" || selectedMode === "debug") ? (
+                <button
+                  type="button"
+                  onClick={onLoadSampleContext}
+                  className="text-xs text-accent transition-colors hover:text-accent/80"
+                >
+                  Load sample context
+                </button>
+              ) : null}
+              <span className="text-xs text-zinc-500">Optional but useful</span>
+            </div>
+          </div>
+          <textarea
+            value={contextText}
+            onChange={(event) => onContextChange(event.target.value)}
+            rows={6}
+            spellCheck={false}
+            placeholder={contextPlaceholder}
+            className="min-h-32 w-full resize-none rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none ring-0 placeholder:text-zinc-500 focus:border-accent/50"
+          />
+        </div>
 
         <div className="space-y-3">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">Quick prompts</p>
@@ -117,9 +177,11 @@ export function PromptPanel({
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">Generation meta</p>
           {result ? (
             <div className="flex flex-wrap gap-2">
+              <Badge>{prettyMode(result.task_mode)}</Badge>
               <Badge>{prettyLabel(result.intent)}</Badge>
               <Badge variant="secondary">{prettyClass(result.class)}</Badge>
               <Badge variant="outline">{result.output_attribute}</Badge>
+              {result.model_used ? <Badge variant="secondary">{result.model_used}</Badge> : null}
             </div>
           ) : (
             <p className="text-sm text-zinc-500">Generate something first.</p>

@@ -1,5 +1,5 @@
-import { generateHeuristicResult } from "@/lib/heuristic";
-import type { Intent, Parameter, ParameterType, VexResult, WrangleClass } from "@/lib/types";
+import { generateHeuristicModeResult } from "@/lib/heuristic";
+import type { Intent, Parameter, ParameterType, ResponseKind, TaskMode, VexResult, WrangleClass } from "@/lib/types";
 import { detectOutputAttribute, extractVexBody, prettyLabel } from "@/lib/utils";
 
 function normalizeIntent(value: unknown, prompt: string): Intent {
@@ -10,7 +10,7 @@ function normalizeIntent(value: unknown, prompt: string): Intent {
     return normalized as Intent;
   }
 
-  return generateHeuristicResult(prompt).intent;
+  return generateHeuristicModeResult("build", prompt, "").intent;
 }
 
 function normalizeClass(value: unknown, prompt: string): WrangleClass {
@@ -21,7 +21,7 @@ function normalizeClass(value: unknown, prompt: string): WrangleClass {
     return normalized as WrangleClass;
   }
 
-  return generateHeuristicResult(prompt).class;
+  return generateHeuristicModeResult("build", prompt, "").class;
 }
 
 function normalizeParameterType(value: unknown): ParameterType {
@@ -80,8 +80,28 @@ function normalizeText(value: unknown, fallback: string) {
   return normalized || fallback;
 }
 
-export function normalizeModelResult(raw: unknown, prompt: string): VexResult {
-  const fallback = generateHeuristicResult(prompt);
+function normalizeTaskMode(value: unknown, fallback: TaskMode): TaskMode {
+  const normalized = String(value || "").trim().toLowerCase();
+
+  if (normalized === "explain" || normalized === "debug" || normalized === "build") {
+    return normalized;
+  }
+
+  return fallback;
+}
+
+function normalizeResponseKind(value: unknown, fallback: ResponseKind): ResponseKind {
+  const normalized = String(value || "").trim().toLowerCase();
+
+  if (normalized === "analysis" || normalized === "code") {
+    return normalized;
+  }
+
+  return fallback;
+}
+
+export function normalizeModelResult(raw: unknown, prompt: string, mode: TaskMode, context: string, modelUsed?: string): VexResult {
+  const fallback = generateHeuristicModeResult(mode, prompt, context);
   const source = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const parameters = normalizeParameters(source.parameters ?? source.params, fallback.parameters);
   const rawCode = normalizeText(source.vex_code ?? source.code, fallback.vex_code);
@@ -89,16 +109,22 @@ export function normalizeModelResult(raw: unknown, prompt: string): VexResult {
   const intent = normalizeIntent(source.intent, prompt);
   const wrangleClass = normalizeClass(source.class, prompt);
   const outputAttribute = normalizeText(source.output_attribute, detectOutputAttribute(vexCode));
+  const taskMode = normalizeTaskMode(source.task_mode, mode);
+  const responseKind = normalizeResponseKind(source.response_kind, taskMode === "build" ? "code" : "analysis");
+  const analysisText = normalizeText(source.analysis_text, fallback.analysis_text);
 
   return {
+    task_mode: taskMode,
+    response_kind: responseKind,
     intent,
     output_attribute: outputAttribute,
-    vex_code: vexCode,
-    parameters,
+    vex_code: responseKind === "analysis" ? "" : vexCode,
+    analysis_text: responseKind === "analysis" ? analysisText : "",
+    parameters: responseKind === "analysis" ? [] : parameters,
     class: wrangleClass,
     explanation: normalizeText(source.explanation, fallback.explanation),
     assumptions: normalizeText(source.assumptions, "Model output normalized for Houdini 20.5 Attribute Wrangle usage."),
     source: "model",
+    model_used: modelUsed,
   };
 }
-

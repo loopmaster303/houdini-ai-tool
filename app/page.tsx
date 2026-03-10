@@ -8,24 +8,94 @@ import { ParamsPanel } from "@/components/ParamsPanel";
 import { PromptPanel } from "@/components/PromptPanel";
 import { DEFAULT_MODEL_ID, RECOMMENDED_MODEL_OPTIONS } from "@/lib/model-options";
 import { getPollenHeaders } from "@/lib/pollen-key";
-import type { ParamMap, ParameterValue, VexResult } from "@/lib/types";
+import type { ParamMap, ParameterValue, TaskMode, VexResult } from "@/lib/types";
+import { prettyMode } from "@/lib/utils";
 import { getDefaultParamMap } from "@/lib/utils";
 
-const EXAMPLES = [
-  "Organic mask from curvature + height",
-  "Wobble on tips with speed and amplitude",
-  "Growth noise along curves",
-  "Procedural color variation",
-];
+const MODE_CONFIG = {
+  build: {
+    examples: [
+      "Organic mask from curvature + height",
+      "Wobble on tips with speed and amplitude",
+      "Growth noise along curves",
+      "Procedural color variation",
+    ],
+    promptPlaceholder:
+      "Build me a point wrangle that creates an organic mask over the surface using height and noise, with controls for frequency, contrast, and displacement strength.",
+    contextPlaceholder:
+      "Paste selected node paths, wrangle snippets, parm values, expected attributes, or a quick network summary here...",
+    sampleContext: "",
+  },
+  explain: {
+    examples: [
+      "Explain the intent and data flow of this growth setup",
+      "What is this solver network doing from frame to frame?",
+      "Summarize this wrangle-heavy SOP chain for a handoff",
+      "Explain which attributes are probably driving the final deformation",
+    ],
+    promptPlaceholder:
+      "Explain what this Houdini network is doing, how data flows through it, and which nodes are the key decision points.",
+    contextPlaceholder:
+      "Paste selected node names, network notes, wrangle snippets, or a quick SOP chain summary here...",
+    sampleContext: `Selected nodes:
+/obj/geo1/attribnoise1
+/obj/geo1/attribwrangle2
+/obj/geo1/color1
+
+Quick notes:
+- attribnoise1 creates pscale and mask variation
+- attribwrangle2 writes f@mask and offsets @P along @N
+- color1 remaps f@mask into Cd
+- Output is copied to points later in the network`,
+  },
+  debug: {
+    examples: [
+      "Debug why this growth wrangle only affects some points",
+      "Why is this displacement setup exploding on animated geo?",
+      "Find the most likely issue in this Copy to Points orientation chain",
+      "Why does this VDB-to-mesh setup look faceted and unstable?",
+    ],
+    promptPlaceholder:
+      "Debug why this Houdini setup is failing, what the most likely causes are, and what I should check first.",
+    contextPlaceholder:
+      "Paste error messages, node paths, expected attributes, wrangle code, parm values, or a quick summary of what is broken...",
+    sampleContext: `Node: /obj/geo1/attribwrangle3
+Type: Attribute Wrangle (Points)
+Goal: grow mask from root to tip on curves
+
+Relevant code:
+float u = f@curveu;
+float growth = chf("growth");
+f@mask = smooth(growth - 0.1, growth, u);
+@P += @N * f@mask * chf("displace");
+
+Problem:
+- only some curves react
+- others stay at zero
+- displacement pops when topology changes
+- spreadsheet shows curveu missing on several branches`,
+  },
+} satisfies Record<
+  TaskMode,
+  {
+    examples: string[];
+    promptPlaceholder: string;
+    contextPlaceholder: string;
+    sampleContext: string;
+  }
+>;
 
 export default function HomePage() {
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
+  const [selectedMode, setSelectedMode] = useState<TaskMode>("build");
   const [prompt, setPrompt] = useState(
     "Build me a point wrangle that creates an organic mask over the surface using height and noise, with controls for frequency, contrast, and displacement strength."
   );
+  const [contextText, setContextText] = useState("");
   const [result, setResult] = useState<VexResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [params, setParams] = useState<ParamMap>({});
+  const modeConfig = MODE_CONFIG[selectedMode];
 
   useEffect(() => {
     try {
@@ -61,7 +131,7 @@ export default function HomePage() {
           "Content-Type": "application/json",
           ...getPollenHeaders(),
         },
-        body: JSON.stringify({ prompt: activePrompt, preferredModel: selectedModel }),
+        body: JSON.stringify({ prompt: activePrompt, context: contextText, mode: selectedMode, preferredModel: selectedModel }),
       });
 
       const payload = (await response.json()) as VexResult | { error: string };
@@ -79,9 +149,12 @@ export default function HomePage() {
 
       startTransition(() => {
         setResult({
+          task_mode: selectedMode,
+          response_kind: selectedMode === "build" ? "code" : "analysis",
           intent: "organic",
           output_attribute: "f@mask",
-          vex_code: "// Generation failed. Try again.",
+          vex_code: selectedMode === "build" ? "// Generation failed. Try again." : "",
+          analysis_text: selectedMode === "build" ? "" : "Generation failed. Try again.",
           parameters: [],
           class: "points",
           explanation: "The request could not be generated.",
@@ -115,17 +188,24 @@ export default function HomePage() {
             transition={loading ? { repeat: Number.POSITIVE_INFINITY, duration: 1.2 } : { duration: 0.2 }}
             className="rounded-full border border-zinc-800 px-3 py-1 text-xs text-zinc-400"
           >
-            {loading ? "Generating Houdini-ready VEX..." : `${selectedModel} with fallback chain or local heuristic`}
+            {loading ? `Running ${prettyMode(selectedMode)}...` : `${selectedModel} in ${prettyMode(selectedMode)} mode with fallback chain`}
           </motion.div>
         </div>
 
         <div className="grid min-h-[calc(100vh-7.5rem)] grid-cols-1 gap-4 xl:grid-cols-[1fr_1.5fr_1fr]">
           <PromptPanel
             prompt={prompt}
+            contextText={contextText}
+            selectedMode={selectedMode}
             loading={loading}
             result={result}
-            examples={EXAMPLES}
+            examples={modeConfig.examples}
+            promptPlaceholder={modeConfig.promptPlaceholder}
+            contextPlaceholder={modeConfig.contextPlaceholder}
             selectedModel={selectedModel}
+            onContextChange={setContextText}
+            onLoadSampleContext={() => setContextText(modeConfig.sampleContext)}
+            onModeChange={setSelectedMode}
             onModelChange={setSelectedModel}
             onPromptChange={setPrompt}
             onSubmit={() => void generate()}

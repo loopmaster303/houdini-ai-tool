@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { ParamMap, Parameter, ParameterValue, VexResult, WrangleClass } from "@/lib/types";
+import type { ParamMap, Parameter, ParameterValue, TaskMode, VexResult, WrangleClass } from "@/lib/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -24,6 +24,17 @@ export function prettyClass(value: WrangleClass) {
       return "Vertices";
     default:
       return "Points";
+  }
+}
+
+export function prettyMode(value: TaskMode) {
+  switch (value) {
+    case "debug":
+      return "Debug";
+    case "explain":
+      return "Explain";
+    default:
+      return "Build";
   }
 }
 
@@ -74,6 +85,10 @@ export function buildCodeHeader(prompt: string, parameters: Parameter[], params:
 }
 
 export function buildDisplayCode(prompt: string, result: VexResult, params: ParamMap) {
+  if (result.response_kind === "analysis") {
+    return result.analysis_text.trim();
+  }
+
   return `${buildCodeHeader(prompt, result.parameters, params)}${result.vex_code}`.trim();
 }
 
@@ -93,4 +108,3 @@ export function detectOutputAttribute(code: string) {
 
   return "f@mask";
 }
-

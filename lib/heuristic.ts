@@ -1,4 +1,4 @@
-import type { Intent, Parameter, VexResult, WrangleClass } from "@/lib/types";
+import type { Intent, Parameter, TaskMode, VexResult, WrangleClass } from "@/lib/types";
 import { extractVexBody } from "@/lib/utils";
 
 function hasAny(text: string, words: string[]) {
@@ -324,6 +324,102 @@ function buildExplanation(intent: Intent, wrangleClass: WrangleClass, outputAttr
 }
 
 export function generateHeuristicResult(prompt: string, assumptions?: string): VexResult {
+  return generateHeuristicModeResult("build", prompt, "", assumptions);
+}
+
+function buildExplainHeuristic(prompt: string, context: string) {
+  const blocks: string[] = [];
+  blocks.push("This is a heuristic explain pass, so it is inferring network intent from your prompt and any pasted Houdini context rather than reading the scene directly.");
+
+  if (context.trim()) {
+    const lower = context.toLowerCase();
+    if (lower.includes("attribwrangle") || lower.includes("wrangle")) {
+      blocks.push("The context suggests a wrangle-heavy setup, which usually means the key behavior lives in attribute creation, masking, deformation, or procedural control logic rather than pure node-level transforms.");
+    }
+    if (lower.includes("solver")) {
+      blocks.push("A solver in the chain usually means state is being accumulated over time, so the important question is what gets fed back each frame and which attributes are treated as persistent state.");
+    }
+    if (lower.includes("vdb")) {
+      blocks.push("VDB nodes in the context suggest the setup is moving between surface geometry and volumetric representations, so resolution and conversion order are likely central to the result.");
+    }
+    blocks.push("Use this as a first-pass read: trace the data from the first meaningful input, identify where attributes or topology change, and then verify the critical node by node behavior inside Houdini.");
+  } else {
+    blocks.push("No Houdini node dump or error context was supplied, so the explanation can only stay high-level. Paste selected node names, parameter snippets, or a network summary to make this mode much more useful.");
+  }
+
+  return blocks.join(" ");
+}
+
+function buildDebugHeuristic(prompt: string, context: string) {
+  const blocks: string[] = [];
+  blocks.push("This is a heuristic debug pass, so it is ranking common Houdini failure patterns from the prompt and pasted context rather than inspecting a live scene.");
+
+  const lower = `${prompt}\n${context}`.toLowerCase();
+  const likelyIssues: string[] = [];
+
+  if (lower.includes("curveu") || lower.includes("curve")) {
+    likelyIssues.push("missing or inconsistent curve parameterization such as f@curveu");
+  }
+  if (lower.includes("@n") || lower.includes("normal")) {
+    likelyIssues.push("missing or unstable normals before a displacement or orientation step");
+  }
+  if (lower.includes("wrangle") || lower.includes("vex")) {
+    likelyIssues.push("wrong wrangle class or writing the right attribute at the wrong element level");
+  }
+  if (lower.includes("vdb")) {
+    likelyIssues.push("resolution or conversion order issues around VDB creation and meshing");
+  }
+  if (lower.includes("copytopoints") || lower.includes("orient") || lower.includes("copy to points")) {
+    likelyIssues.push("orientation attributes not being present or not normalized correctly");
+  }
+
+  if (likelyIssues.length > 0) {
+    blocks.push(`Most likely checks first: ${likelyIssues.slice(0, 3).join(", ")}.`);
+  } else {
+    blocks.push("Most likely checks first: upstream attributes actually exist, the node is cooking valid geometry, and the operation is running over the intended class.");
+  }
+
+  blocks.push("For the next pass, paste the exact node type, error message, relevant parameter values, and any attribute names you expect to exist. That usually collapses the search space much faster.");
+  return blocks.join(" ");
+}
+
+export function generateHeuristicModeResult(mode: TaskMode, prompt: string, context: string, assumptions?: string): VexResult {
+  if (mode === "explain") {
+    return {
+      task_mode: mode,
+      response_kind: "analysis",
+      intent: "organic",
+      output_attribute: "-",
+      vex_code: "",
+      analysis_text: buildExplainHeuristic(prompt, context),
+      parameters: [],
+      class: "points",
+      explanation: "A heuristic read of likely network intent and data flow based on the supplied prompt and context.",
+      assumptions:
+        assumptions ||
+        "No live Houdini scene was inspected. This explanation is inferred from your prompt and any pasted node/context notes.",
+      source: "heuristic",
+    };
+  }
+
+  if (mode === "debug") {
+    return {
+      task_mode: mode,
+      response_kind: "analysis",
+      intent: "organic",
+      output_attribute: "-",
+      vex_code: "",
+      analysis_text: buildDebugHeuristic(prompt, context),
+      parameters: [],
+      class: "points",
+      explanation: "A heuristic debug read that prioritizes likely Houdini failure points from the supplied prompt and context.",
+      assumptions:
+        assumptions ||
+        "No live Houdini scene was inspected. This diagnosis is inferred from your prompt and any pasted node/context notes.",
+      source: "heuristic",
+    };
+  }
+
   const intent = detectIntent(prompt);
   const wrangleClass = detectClass(prompt, intent);
   const outputAttribute = detectOutputAttribute(intent);
@@ -331,9 +427,12 @@ export function generateHeuristicResult(prompt: string, assumptions?: string): V
   const vexCodeWithHeader = generateCode(intent, parameters, wrangleClass, prompt);
 
   return {
+    task_mode: mode,
+    response_kind: "code",
     intent,
     output_attribute: outputAttribute,
     vex_code: extractVexBody(vexCodeWithHeader),
+    analysis_text: "",
     parameters,
     class: wrangleClass,
     explanation: buildExplanation(intent, wrangleClass, outputAttribute),
@@ -343,4 +442,3 @@ export function generateHeuristicResult(prompt: string, assumptions?: string): V
     source: "heuristic",
   };
 }
-

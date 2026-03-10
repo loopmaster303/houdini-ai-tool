@@ -28,6 +28,7 @@ export function ExplanationPanel({ result }: { result: VexResult | null }) {
             <div className="flex items-center gap-2">
               <Badge>{result.source === "model" ? "AI" : "Heuristic"}</Badge>
               <Badge variant="secondary">{result.output_attribute}</Badge>
+              {result.model_used ? <Badge variant="outline">{result.model_used}</Badge> : null}
             </div>
             <p className="mt-4 text-sm leading-7 text-zinc-200">{result.explanation}</p>
             {result.assumptions ? (
@@ -45,4 +46,3 @@ export function ExplanationPanel({ result }: { result: VexResult | null }) {
     </Card>
   );
 }
-
