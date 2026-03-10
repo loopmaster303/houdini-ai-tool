@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { buildModelChain } from "@/lib/model-options";
 import type { TaskMode } from "@/lib/types";
+import { extractChannelRefs, findSuspiciousVexTokens } from "@/lib/vex";
 
 function extractMessageText(content: unknown) {
   if (typeof content === "string") {
@@ -45,6 +46,54 @@ function extractJsonObject(text: string) {
   }
 }
 
+function validateModelPayload(raw: unknown, mode: TaskMode, model: string) {
+  const source = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+
+  if (mode === "build") {
+    const code = String(source.vex_code ?? source.code ?? "").trim();
+    if (!code) {
+      throw new Error(`Model ${model} returned no VEX code.`);
+    }
+
+    if (code.includes("```")) {
+      throw new Error(`Model ${model} returned fenced code instead of raw VEX.`);
+    }
+
+    const suspiciousTokens = findSuspiciousVexTokens(code);
+    if (suspiciousTokens.length > 0) {
+      throw new Error(`Model ${model} returned suspicious non-VEX tokens: ${suspiciousTokens.join(", ")}.`);
+    }
+
+    const channelRefs = extractChannelRefs(code);
+    if (channelRefs.length === 0) {
+      throw new Error(`Model ${model} returned build output without chf/chi/chb controls.`);
+    }
+
+    const parameterList = Array.isArray(source.parameters ?? source.params)
+      ? ((source.parameters ?? source.params) as Array<Record<string, unknown>>)
+      : [];
+
+    for (const parameter of parameterList) {
+      const rawName = String(parameter.name ?? "").trim().toLowerCase();
+      if (!rawName) {
+        continue;
+      }
+
+      const matches = channelRefs.some((ref) => ref.name === rawName);
+      if (!matches) {
+        throw new Error(`Model ${model} declared parameter "${rawName}" but did not use it in VEX.`);
+      }
+    }
+
+    return;
+  }
+
+  const analysisText = String(source.analysis_text ?? source.explanation ?? "").trim();
+  if (!analysisText) {
+    throw new Error(`Model ${model} returned no analysis text for ${mode} mode.`);
+  }
+}
+
 let cachedSystemPrompt: string | null = null;
 
 async function getSystemPrompt() {
@@ -74,6 +123,16 @@ async function requestModel(prompt: string, context: string, mode: TaskMode, api
             `TASK MODE: ${mode}`,
             `USER PROMPT:\n${prompt}`,
             context.trim() ? `HOUDINI CONTEXT:\n${context.trim()}` : "HOUDINI CONTEXT:\n(none supplied)",
+            mode === "build"
+              ? [
+                  "BUILD CHECKLIST:",
+                  "- return Houdini Attribute Wrangle VEX only in vex_code",
+                  "- every exposed control must use chf, chi, or chb",
+                  "- do not use GLSL or JS tokens such as vec3, fract, rotateX, rotateY, rotateZ",
+                  "- prefer points unless the effect truly requires primitives, detail, or vertices",
+                  '- for curve progression prefer f@curveu when available, otherwise derive a stable 0-1 value such as relbbox(0, @P).y',
+                ].join("\n")
+              : "ANALYSIS CHECKLIST:\n- be Houdini-specific\n- rank likely causes or key nodes\n- keep the answer concrete and short",
           ].join("\n\n"),
         },
       ],
@@ -98,8 +157,11 @@ async function requestModel(prompt: string, context: string, mode: TaskMode, api
     throw new Error(`Pollinations returned an empty message for ${model}.`);
   }
 
+  const raw = extractJsonObject(content);
+  validateModelPayload(raw, mode, model);
+
   return {
-    raw: extractJsonObject(content),
+    raw,
     modelUsed: model,
   };
 }

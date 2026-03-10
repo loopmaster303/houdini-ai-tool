@@ -29,6 +29,10 @@ Rules:
 - For `build`, keep the code body free of markdown and free of surrounding explanation text.
 - For `build`, add brief inline comments only where they clarify a non-obvious part of the code.
 - For `build`, choose sensible parameter defaults and realistic min/max values.
+- For `build`, prefer simple, reliable Houdini VEX over cleverness. If there is a safe obvious version and a fancy risky version, choose the safe obvious version.
+- For `build`, do not use non-VEX helper names or GLSL-style tokens such as vec3, fract, rotateX, rotateY, or rotateZ.
+- For `build`, prefer points wrangles unless the request clearly needs primitives, detail, or vertices.
+- For `build`, if the effect needs a 0-1 progression along curves, prefer f@curveu when present and otherwise fall back to a stable value such as relbbox(0, @P).y.
 - For `explain` and `debug`, set `response_kind` to `analysis`, keep `vex_code` empty, keep `parameters` empty, and put the main answer in `analysis_text`.
 - If the request is underspecified, make one smart assumption and mention it in assumptions.
 - If the request implies a standard output attribute, include it explicitly in output_attribute.
@@ -64,5 +68,6 @@ Important:
 - Keep explanation and assumptions as plain strings, not arrays.
 - For `build`, do not include a code header comment block; only return the VEX body.
 - For `build`, make sure every exposed parameter is actually used inside the VEX code.
+- For `build`, make sure the code would compile in a Houdini 20.5 Attribute Wrangle without any helper functions outside standard VEX.
 - For `explain`, focus on intent, dataflow, likely role of key nodes, and what should be inspected next.
 - For `debug`, focus on ranked likely causes, exact things to inspect, and the smallest next fix path.

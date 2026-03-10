@@ -1,6 +1,7 @@
 import { generateHeuristicModeResult } from "@/lib/heuristic";
 import type { Intent, Parameter, ParameterType, ResponseKind, TaskMode, VexResult, WrangleClass } from "@/lib/types";
 import { detectOutputAttribute, extractVexBody, prettyLabel } from "@/lib/utils";
+import { buildSuggestedParameter, extractChannelRefs } from "@/lib/vex";
 
 function normalizeIntent(value: unknown, prompt: string): Intent {
   const normalized = String(value || "").trim().toLowerCase();
@@ -67,12 +68,37 @@ function normalizeParam(raw: unknown, index: number): Parameter {
   };
 }
 
-function normalizeParameters(value: unknown, fallback: Parameter[]) {
-  if (!Array.isArray(value) || value.length === 0) {
-    return fallback;
+function normalizeParameters(value: unknown, fallback: Parameter[], code: string) {
+  const refs = extractChannelRefs(code);
+  const normalizedParams = Array.isArray(value) && value.length > 0 ? value.map(normalizeParam) : [];
+  const merged = new Map<string, Parameter>();
+
+  for (const parameter of normalizedParams) {
+    merged.set(parameter.name, parameter);
   }
 
-  return value.map(normalizeParam);
+  for (const ref of refs) {
+    const existing = merged.get(ref.name);
+    if (!existing) {
+      merged.set(ref.name, buildSuggestedParameter(ref.name, ref.type));
+      continue;
+    }
+
+    if (existing.type !== ref.type) {
+      const suggested = buildSuggestedParameter(ref.name, ref.type);
+      merged.set(ref.name, {
+        ...suggested,
+        label: existing.label || suggested.label,
+        help: existing.help || suggested.help,
+      });
+    }
+  }
+
+  if (merged.size > 0) {
+    return [...merged.values()];
+  }
+
+  return fallback;
 }
 
 function normalizeText(value: unknown, fallback: string) {
@@ -103,15 +129,15 @@ function normalizeResponseKind(value: unknown, fallback: ResponseKind): Response
 export function normalizeModelResult(raw: unknown, prompt: string, mode: TaskMode, context: string, modelUsed?: string): VexResult {
   const fallback = generateHeuristicModeResult(mode, prompt, context);
   const source = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const parameters = normalizeParameters(source.parameters ?? source.params, fallback.parameters);
   const rawCode = normalizeText(source.vex_code ?? source.code, fallback.vex_code);
   const vexCode = extractVexBody(rawCode);
+  const parameters = normalizeParameters(source.parameters ?? source.params, fallback.parameters, vexCode);
   const intent = normalizeIntent(source.intent, prompt);
   const wrangleClass = normalizeClass(source.class, prompt);
   const outputAttribute = normalizeText(source.output_attribute, detectOutputAttribute(vexCode));
   const taskMode = normalizeTaskMode(source.task_mode, mode);
   const responseKind = normalizeResponseKind(source.response_kind, taskMode === "build" ? "code" : "analysis");
-  const analysisText = normalizeText(source.analysis_text, fallback.analysis_text);
+  const analysisText = normalizeText(source.analysis_text, normalizeText(source.explanation, fallback.analysis_text));
 
   return {
     task_mode: taskMode,
