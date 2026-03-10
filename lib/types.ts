@@ -29,6 +29,7 @@ export interface VexResult {
   assumptions: string;
   source: "model" | "heuristic";
   model_used?: string;
+  validation_notes?: string[];
 }
 
 export type ParamMap = Record<string, ParameterValue>;

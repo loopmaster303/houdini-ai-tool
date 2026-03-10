@@ -160,6 +160,10 @@ export default function HomePage() {
           explanation: "The request could not be generated.",
           assumptions: message,
           source: "heuristic",
+          validation_notes:
+            selectedMode === "build"
+              ? ["Generation failed before a VEX result could be validated."]
+              : ["Generation failed before an analysis result could be reviewed."],
         });
         setParams({});
       });

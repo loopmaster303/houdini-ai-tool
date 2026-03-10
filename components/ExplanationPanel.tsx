@@ -2,11 +2,14 @@
 
 import { motion } from "framer-motion";
 import type { VexResult } from "@/lib/types";
+import { validateVexResult } from "@/lib/validate-result";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
 export function ExplanationPanel({ result }: { result: VexResult | null }) {
+  const validationNotes = result ? (result.validation_notes ?? validateVexResult(result)) : [];
+
   return (
     <Card className="h-full">
       <CardHeader>
@@ -31,6 +34,21 @@ export function ExplanationPanel({ result }: { result: VexResult | null }) {
               {result.model_used ? <Badge variant="outline">{result.model_used}</Badge> : null}
             </div>
             <p className="mt-4 text-sm leading-7 text-zinc-200">{result.explanation}</p>
+            <Separator className="my-4" />
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">Static validation</p>
+              {validationNotes.length === 0 ? (
+                <p className="mt-2 text-sm leading-6 text-zinc-300">No obvious structural problems were found in the output.</p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  {validationNotes.map((note) => (
+                    <p key={note} className="text-sm leading-6 text-zinc-400">
+                      {note}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
             {result.assumptions ? (
               <>
                 <Separator className="my-4" />

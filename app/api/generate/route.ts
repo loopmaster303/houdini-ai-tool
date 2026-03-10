@@ -3,6 +3,7 @@ import { generateHeuristicModeResult } from "@/lib/heuristic";
 import { normalizeModelResult } from "@/lib/normalize";
 import { callPollinations } from "@/lib/pollinations";
 import { resolvePollenKey } from "@/lib/resolve-pollen-key";
+import { validateVexResult } from "@/lib/validate-result";
 import type { TaskMode } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -20,29 +21,31 @@ export async function POST(request: Request) {
     const apiKey = resolvePollenKey(request);
 
     if (!apiKey) {
-      return NextResponse.json(
-        generateHeuristicModeResult(
-          mode,
-          prompt,
-          context,
-          "No Pollinations key is connected, so the app is using the local heuristic generator."
-        )
+      const result = generateHeuristicModeResult(
+        mode,
+        prompt,
+        context,
+        "No Pollinations key is connected, so the app is using the local heuristic generator."
       );
+      result.validation_notes = validateVexResult(result);
+      return NextResponse.json(result);
     }
 
     try {
       const response = await callPollinations(prompt, context, mode, apiKey, preferredModel);
-      return NextResponse.json(normalizeModelResult(response.raw, prompt, mode, context, response.modelUsed));
+      const result = normalizeModelResult(response.raw, prompt, mode, context, response.modelUsed);
+      result.validation_notes = validateVexResult(result);
+      return NextResponse.json(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown model error.";
-      return NextResponse.json(
-        generateHeuristicModeResult(
-          mode,
-          prompt,
-          context,
-          `Pollinations failed, so the app fell back to the local heuristic generator. ${message}`
-        )
+      const result = generateHeuristicModeResult(
+        mode,
+        prompt,
+        context,
+        `Pollinations failed, so the app fell back to the local heuristic generator. ${message}`
       );
+      result.validation_notes = validateVexResult(result);
+      return NextResponse.json(result);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Invalid request.";

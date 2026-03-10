@@ -65,6 +65,12 @@ Current task modes:
 - `Explain` for network/dataflow interpretation from pasted context
 - `Debug` for likely-cause diagnosis from pasted context and errors
 
+Testing without Houdini:
+
+- the app runs static plausibility checks on each result
+- it flags obvious issues such as suspicious non-VEX tokens, missing `ch()` controls, slider/code mismatches, likely wrong wrangle class, or unsafe `curveu` assumptions
+- this is not a real Houdini cook, but it is a useful first filter before artist review
+
 ## Notes
 
 - The heuristic fallback is ported from the original spike logic and templates.
