@@ -4,6 +4,20 @@ import { normalizeModelResult } from "@/lib/normalize";
 import { getPromptForMode, getRepairPrompt } from "@/lib/prompts";
 import { getValidationReport } from "@/lib/validate-result";
 
+export const POLLINATIONS_CHAT_URL = "https://gen.pollinations.ai/v1/chat/completions";
+
+export function buildPollinationsChatRequestBody(systemPrompt: string, userContent: string, model: string) {
+  return {
+    model,
+    messages: [
+      { role: "system" as const, content: systemPrompt },
+      { role: "user" as const, content: userContent },
+    ],
+    response_format: { type: "json_object" as const },
+    max_tokens: 2000,
+  };
+}
+
 function extractMessageText(content: unknown) {
   if (typeof content === "string") {
     return content;
@@ -50,20 +64,13 @@ async function requestModelText(systemPrompt: string, userContent: string, apiKe
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
   try {
-    const response = await fetch("https://gen.pollinations.ai/v1/chat/completions", {
+    const response = await fetch(POLLINATIONS_CHAT_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent },
-        ],
-        max_tokens: 2000,
-      }),
+      body: JSON.stringify(buildPollinationsChatRequestBody(systemPrompt, userContent, model)),
       cache: "no-store",
       signal: controller.signal,
     });

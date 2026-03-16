@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const STORAGE_KEY = "pollenApiKey";
 const ACCOUNT_POLL_INTERVAL = 60_000;
+export const POLLINATIONS_ACCOUNT_BALANCE_URL = "https://gen.pollinations.ai/account/balance";
 
 interface PollenAccountInfo {
   balance: number | null;
@@ -106,7 +107,7 @@ export function usePollenKey(): UsePollenKeyReturn {
     setIsLoadingAccount(true);
     setAccountStatus("checking");
     try {
-      const response = await fetch("https://enter.pollinations.ai/api/account/balance", {
+      const response = await fetch(POLLINATIONS_ACCOUNT_BALANCE_URL, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${key}`,
@@ -120,17 +121,16 @@ export function usePollenKey(): UsePollenKeyReturn {
       }
 
       const data = (await response.json()) as Record<string, unknown>;
-      const isValid = typeof data.valid === "boolean" ? data.valid : true;
       setAccountInfo({
         balance: typeof data.balance === "number" ? data.balance : typeof data.pollen_count === "number" ? data.pollen_count : null,
         expiresAt: typeof data.expires_at === "string" ? data.expires_at : null,
         expiresIn: typeof data.expires_in === "number" ? data.expires_in : null,
-        valid: isValid,
+        valid: true,
         keyType: typeof data.key_type === "string" ? data.key_type : null,
         pollenBudget: typeof data.pollen_budget === "number" ? data.pollen_budget : null,
         rateLimitEnabled: typeof data.rate_limit_enabled === "boolean" ? data.rate_limit_enabled : false,
       });
-      setAccountStatus(isValid ? "valid" : "invalid");
+      setAccountStatus("valid");
     } catch {
       setAccountInfo(null);
       setAccountStatus("unknown");

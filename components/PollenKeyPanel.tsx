@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, LogOut, Zap } from "lucide-react";
 import { usePollenKey } from "@/hooks/usePollenKey";
 import type { ProviderStatus } from "@/lib/types";
+import { getPollenHeaders } from "@/lib/pollen-key";
+import type { PollinationsProbeResponse } from "@/lib/pollinations-key-health";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
@@ -14,6 +16,8 @@ interface PollenKeyPanelProps {
 export function PollenKeyPanel({ latestProviderStatus }: PollenKeyPanelProps) {
   const { pollenKey, accountInfo, isLoadingAccount, accountStatus, connectOAuth, connectManual, disconnect } = usePollenKey();
   const [manualKeyInput, setManualKeyInput] = useState("");
+  const [probeResult, setProbeResult] = useState<PollinationsProbeResponse | null>(null);
+  const [isTestingKey, setIsTestingKey] = useState(false);
 
   const maskedKey = pollenKey ? `${pollenKey.slice(0, 6)}...${pollenKey.slice(-4)}` : "";
   const hasKey = !!pollenKey;
@@ -31,6 +35,10 @@ export function PollenKeyPanel({ latestProviderStatus }: PollenKeyPanelProps) {
   const dotClass =
     !hasKey ? "bg-zinc-500" : accountStatus === "valid" ? "bg-emerald-400" : accountStatus === "checking" ? "bg-amber-300" : "bg-rose-300";
 
+  useEffect(() => {
+    setProbeResult(null);
+  }, [pollenKey]);
+
   function handleManualConnect() {
     if (!manualKeyInput.trim()) {
       return;
@@ -38,6 +46,37 @@ export function PollenKeyPanel({ latestProviderStatus }: PollenKeyPanelProps) {
 
     connectManual(manualKeyInput.trim());
     setManualKeyInput("");
+  }
+
+  async function handleTestKey() {
+    setIsTestingKey(true);
+    try {
+      const response = await fetch("/api/pollinations/test-key", {
+        method: "GET",
+        headers: getPollenHeaders(),
+      });
+
+      const payload = (await response.json()) as PollinationsProbeResponse;
+      setProbeResult(payload);
+    } catch {
+      setProbeResult({
+        account: {
+          ok: false,
+          status: 0,
+          message: "Could not run the account probe.",
+          valid: null,
+          keyType: null,
+        },
+        generation: {
+          ok: false,
+          status: 0,
+          message: "Could not reach the local probe route.",
+          model: "openai-fast",
+        },
+      });
+    } finally {
+      setIsTestingKey(false);
+    }
   }
 
   return (
@@ -92,12 +131,40 @@ export function PollenKeyPanel({ latestProviderStatus }: PollenKeyPanelProps) {
                 Generation auth failed. Reconnect your Pollinations key.
               </div>
             ) : null}
+
+            {probeResult ? (
+              <div className="mt-3 space-y-2 rounded-md border border-zinc-800 bg-zinc-950/80 px-3 py-3 text-xs">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-zinc-500">Account probe</span>
+                  <span className={probeResult.account.ok ? "text-emerald-300" : "text-rose-300"}>
+                    {probeResult.account.ok ? "OK" : `${probeResult.account.status || "ERR"}`}
+                  </span>
+                </div>
+                <p className="text-zinc-400">{probeResult.account.message}</p>
+                {probeResult.account.keyType ? <p className="text-zinc-500">Key type: {probeResult.account.keyType}</p> : null}
+
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span className="text-zinc-500">Generation probe</span>
+                  <span className={probeResult.generation.ok ? "text-emerald-300" : "text-rose-300"}>
+                    {probeResult.generation.ok ? "OK" : `${probeResult.generation.status || "ERR"}`}
+                  </span>
+                </div>
+                <p className="text-zinc-400">{probeResult.generation.message}</p>
+                <p className="text-zinc-500">Model: {probeResult.generation.model}</p>
+              </div>
+            ) : null}
           </div>
 
-          <Button variant="ghost" className="w-full justify-center text-rose-300 hover:bg-rose-500/10 hover:text-rose-200" onClick={disconnect}>
-            <LogOut className="h-4 w-4" />
-            Disconnect
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1 justify-center" disabled={isTestingKey} onClick={() => void handleTestKey()}>
+              {isTestingKey ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {isTestingKey ? "Testing..." : "Test key"}
+            </Button>
+            <Button variant="ghost" className="flex-1 justify-center text-rose-300 hover:bg-rose-500/10 hover:text-rose-200" onClick={disconnect}>
+              <LogOut className="h-4 w-4" />
+              Disconnect
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="mt-4 space-y-3">
