@@ -160,6 +160,8 @@ export default function HomePage() {
           explanation: "The request could not be generated.",
           assumptions: message,
           source: "heuristic",
+          readiness: "needs_review",
+          repair_attempted: false,
           validation_notes:
             selectedMode === "build"
               ? ["Generation failed before a VEX result could be validated."]
@@ -185,7 +187,7 @@ export default function HomePage() {
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Idea to VEX</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-50">Prompt in. VEX out. Sliders extracted.</h1>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-50">Prompt in. Wrangle out. Copy first.</h1>
           </div>
           <motion.div
             animate={loading ? { opacity: [0.5, 1, 0.5] } : { opacity: 1 }}
@@ -219,7 +221,7 @@ export default function HomePage() {
             }}
           />
 
-          <div className="grid min-h-[640px] grid-rows-[minmax(260px,0.9fr)_minmax(320px,1.1fr)] gap-4">
+          <div className="grid min-h-[640px] grid-rows-[minmax(180px,0.6fr)_minmax(400px,1.4fr)] gap-4">
             <ParamsPanel result={result} params={params} onParamChange={handleParamChange} />
             <CodePanel prompt={prompt} result={result} params={params} />
           </div>

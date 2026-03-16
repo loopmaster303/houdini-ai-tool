@@ -58,6 +58,7 @@ function detectOutputAttribute(intent: Intent) {
     case "color":
       return "@Cd";
     case "wobble":
+    case "twist":
       return "@P";
     default:
       return "f@mask";

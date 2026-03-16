@@ -1,8 +1,8 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { buildModelChain } from "@/lib/model-options";
 import type { TaskMode } from "@/lib/types";
-import { extractChannelRefs, findSuspiciousVexTokens } from "@/lib/vex";
+import { normalizeModelResult } from "@/lib/normalize";
+import { getPromptForMode, getRepairPrompt } from "@/lib/prompts";
+import { getValidationReport } from "@/lib/validate-result";
 
 function extractMessageText(content: unknown) {
   if (typeof content === "string") {
@@ -46,67 +46,7 @@ function extractJsonObject(text: string) {
   }
 }
 
-function validateModelPayload(raw: unknown, mode: TaskMode, model: string) {
-  const source = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-
-  if (mode === "build") {
-    const code = String(source.vex_code ?? source.code ?? "").trim();
-    if (!code) {
-      throw new Error(`Model ${model} returned no VEX code.`);
-    }
-
-    if (code.includes("```")) {
-      throw new Error(`Model ${model} returned fenced code instead of raw VEX.`);
-    }
-
-    const suspiciousTokens = findSuspiciousVexTokens(code);
-    if (suspiciousTokens.length > 0) {
-      throw new Error(`Model ${model} returned suspicious non-VEX tokens: ${suspiciousTokens.join(", ")}.`);
-    }
-
-    const channelRefs = extractChannelRefs(code);
-    if (channelRefs.length === 0) {
-      throw new Error(`Model ${model} returned build output without chf/chi/chb controls.`);
-    }
-
-    const parameterList = Array.isArray(source.parameters ?? source.params)
-      ? ((source.parameters ?? source.params) as Array<Record<string, unknown>>)
-      : [];
-
-    for (const parameter of parameterList) {
-      const rawName = String(parameter.name ?? "").trim().toLowerCase();
-      if (!rawName) {
-        continue;
-      }
-
-      const matches = channelRefs.some((ref) => ref.name === rawName);
-      if (!matches) {
-        throw new Error(`Model ${model} declared parameter "${rawName}" but did not use it in VEX.`);
-      }
-    }
-
-    return;
-  }
-
-  const analysisText = String(source.analysis_text ?? source.explanation ?? "").trim();
-  if (!analysisText) {
-    throw new Error(`Model ${model} returned no analysis text for ${mode} mode.`);
-  }
-}
-
-let cachedSystemPrompt: string | null = null;
-
-async function getSystemPrompt() {
-  if (cachedSystemPrompt) {
-    return cachedSystemPrompt;
-  }
-
-  cachedSystemPrompt = await readFile(path.join(process.cwd(), "prompts/system.md"), "utf8");
-  return cachedSystemPrompt;
-}
-
-async function requestModel(prompt: string, context: string, mode: TaskMode, apiKey: string, model: string) {
-  const systemPrompt = await getSystemPrompt();
+async function requestModelText(systemPrompt: string, userContent: string, apiKey: string, model: string) {
   const response = await fetch("https://gen.pollinations.ai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -117,24 +57,7 @@ async function requestModel(prompt: string, context: string, mode: TaskMode, api
       model,
       messages: [
         { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: [
-            `TASK MODE: ${mode}`,
-            `USER PROMPT:\n${prompt}`,
-            context.trim() ? `HOUDINI CONTEXT:\n${context.trim()}` : "HOUDINI CONTEXT:\n(none supplied)",
-            mode === "build"
-              ? [
-                  "BUILD CHECKLIST:",
-                  "- return Houdini Attribute Wrangle VEX only in vex_code",
-                  "- every exposed control must use chf, chi, or chb",
-                  "- do not use GLSL or JS tokens such as vec3, fract, rotateX, rotateY, rotateZ",
-                  "- prefer points unless the effect truly requires primitives, detail, or vertices",
-                  '- for curve progression prefer f@curveu when available, otherwise derive a stable 0-1 value such as relbbox(0, @P).y',
-                ].join("\n")
-              : "ANALYSIS CHECKLIST:\n- be Houdini-specific\n- rank likely causes or key nodes\n- keep the answer concrete and short",
-          ].join("\n\n"),
-        },
+        { role: "user", content: userContent },
       ],
       max_tokens: 2000,
     }),
@@ -157,13 +80,97 @@ async function requestModel(prompt: string, context: string, mode: TaskMode, api
     throw new Error(`Pollinations returned an empty message for ${model}.`);
   }
 
-  const raw = extractJsonObject(content);
-  validateModelPayload(raw, mode, model);
+  return content;
+}
 
-  return {
-    raw,
-    modelUsed: model,
-  };
+function buildUserContent(prompt: string, context: string, mode: TaskMode) {
+  return [
+    `TASK MODE: ${mode}`,
+    `USER PROMPT:\n${prompt}`,
+    context.trim() ? `HOUDINI CONTEXT:\n${context.trim()}` : "HOUDINI CONTEXT:\n(none supplied)",
+    mode === "build"
+      ? [
+          "BUILD CHECKLIST:",
+          "- return Houdini Attribute Wrangle VEX only in vex_code",
+          "- every exposed control must use chf, chi, or chb",
+          "- do not use GLSL or JS tokens such as vec3, fract, rotateX, rotateY, rotateZ",
+          "- prefer points unless the effect truly requires primitives, detail, or vertices",
+          '- for curve progression prefer f@curveu when available, otherwise derive a stable 0-1 value such as relbbox(0, @P).y',
+        ].join("\n")
+      : "ANALYSIS CHECKLIST:\n- be Houdini-specific\n- rank likely causes or key nodes\n- keep the answer concrete and short",
+  ].join("\n\n");
+}
+
+async function attemptRepair(
+  prompt: string,
+  context: string,
+  apiKey: string,
+  model: string,
+  brokenContent: string,
+  failures: string[]
+) {
+  const repairPrompt = await getRepairPrompt();
+  const userContent = [
+    "TASK MODE: build",
+    `ORIGINAL USER PROMPT:\n${prompt}`,
+    context.trim() ? `HOUDINI CONTEXT:\n${context.trim()}` : "HOUDINI CONTEXT:\n(none supplied)",
+    `VALIDATION FAILURES:\n${failures.map((failure) => `- ${failure}`).join("\n")}`,
+    `BROKEN RESPONSE TO FIX:\n${brokenContent}`,
+  ].join("\n\n");
+
+  return requestModelText(repairPrompt, userContent, apiKey, model);
+}
+
+async function requestBuildCandidate(prompt: string, context: string, apiKey: string, model: string) {
+  const systemPrompt = await getPromptForMode("build");
+  const userContent = buildUserContent(prompt, context, "build");
+  const initialContent = await requestModelText(systemPrompt, userContent, apiKey, model);
+
+  let initialRaw: unknown;
+  try {
+    initialRaw = extractJsonObject(initialContent);
+  } catch (error) {
+    const repairedContent = await attemptRepair(prompt, context, apiKey, model, initialContent, [
+      error instanceof Error ? error.message : "Invalid JSON response.",
+    ]);
+    const repairedRaw = extractJsonObject(repairedContent);
+    const repairedResult = normalizeModelResult(repairedRaw, prompt, "build", context, model);
+    const repairedReport = getValidationReport(repairedResult);
+    if (repairedReport.hardFailures.length > 0) {
+      throw new Error(`Repair failed for ${model}: ${repairedReport.hardFailures.join(" | ")}`);
+    }
+    return { raw: repairedRaw, modelUsed: model, repairAttempted: true };
+  }
+
+  const initialResult = normalizeModelResult(initialRaw, prompt, "build", context, model);
+  const initialReport = getValidationReport(initialResult);
+  if (initialReport.hardFailures.length === 0) {
+    return { raw: initialRaw, modelUsed: model, repairAttempted: false };
+  }
+
+  const repairedContent = await attemptRepair(prompt, context, apiKey, model, initialContent, initialReport.hardFailures);
+  const repairedRaw = extractJsonObject(repairedContent);
+  const repairedResult = normalizeModelResult(repairedRaw, prompt, "build", context, model);
+  const repairedReport = getValidationReport(repairedResult);
+
+  if (repairedReport.hardFailures.length > 0) {
+    throw new Error(`Repair failed for ${model}: ${repairedReport.hardFailures.join(" | ")}`);
+  }
+
+  return { raw: repairedRaw, modelUsed: model, repairAttempted: true };
+}
+
+async function requestAnalysisCandidate(prompt: string, context: string, mode: Exclude<TaskMode, "build">, apiKey: string, model: string) {
+  const systemPrompt = await getPromptForMode(mode);
+  const content = await requestModelText(systemPrompt, buildUserContent(prompt, context, mode), apiKey, model);
+  const raw = extractJsonObject(content);
+  const result = normalizeModelResult(raw, prompt, mode, context, model);
+
+  if (!result.analysis_text.trim()) {
+    throw new Error(`Model ${model} returned no analysis text for ${mode} mode.`);
+  }
+
+  return { raw, modelUsed: model, repairAttempted: false };
 }
 
 export async function callPollinations(prompt: string, context: string, mode: TaskMode, apiKey: string, preferredModel?: string) {
@@ -176,7 +183,11 @@ export async function callPollinations(prompt: string, context: string, mode: Ta
 
   for (const model of models) {
     try {
-      return await requestModel(prompt, context, mode, apiKey, model);
+      if (mode === "build") {
+        return await requestBuildCandidate(prompt, context, apiKey, model);
+      }
+
+      return await requestAnalysisCandidate(prompt, context, mode, apiKey, model);
     } catch (error) {
       const message = error instanceof Error ? error.message : `Unknown failure for ${model}.`;
       const status = error instanceof Error && "status" in error ? Number((error as Error & { status?: number }).status) : undefined;

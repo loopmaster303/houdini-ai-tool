@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { ParamMap, Parameter, ParameterValue, TaskMode, VexResult, WrangleClass } from "@/lib/types";
+import type { ParamMap, Parameter, ParameterValue, Readiness, TaskMode, VexResult, WrangleClass } from "@/lib/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -35,6 +35,18 @@ export function prettyMode(value: TaskMode) {
       return "Explain";
     default:
       return "Build";
+  }
+}
+
+export function prettyReadiness(value?: Readiness) {
+  switch (value) {
+    case "fallback":
+      return "Heuristic fallback";
+    case "needs_review":
+      return "Needs review";
+    case "ready":
+    default:
+      return "Ready";
   }
 }
 

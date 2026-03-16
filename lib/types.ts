@@ -4,6 +4,7 @@ export type ParameterType = "float" | "int" | "bool";
 export type ParameterValue = number | boolean;
 export type TaskMode = "build" | "explain" | "debug";
 export type ResponseKind = "code" | "analysis";
+export type Readiness = "ready" | "needs_review" | "fallback";
 
 export interface Parameter {
   name: string;
@@ -30,6 +31,8 @@ export interface VexResult {
   source: "model" | "heuristic";
   model_used?: string;
   validation_notes?: string[];
+  readiness?: Readiness;
+  repair_attempted?: boolean;
 }
 
 export type ParamMap = Record<string, ParameterValue>;

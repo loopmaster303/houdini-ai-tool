@@ -1,0 +1,74 @@
+[
+  {
+    "id": "build-mask-surface",
+    "mode": "build",
+    "prompt": "Create a point wrangle that builds an organic mask from height and noise over a surface.",
+    "context": ""
+  },
+  {
+    "id": "build-wobble-curves",
+    "mode": "build",
+    "prompt": "Add wobble on curve tips with speed and amplitude controls.",
+    "context": ""
+  },
+  {
+    "id": "build-growth-curves",
+    "mode": "build",
+    "prompt": "Create growth noise along curves with a soft reveal front and a displacement amount.",
+    "context": ""
+  },
+  {
+    "id": "build-color-variation",
+    "mode": "build",
+    "prompt": "Make a point wrangle for procedural color variation with saturation and seed controls.",
+    "context": ""
+  },
+  {
+    "id": "build-twist-y",
+    "mode": "build",
+    "prompt": "Twist the geometry around Y with falloff and subtle noise breakup.",
+    "context": ""
+  },
+  {
+    "id": "build-detail-counter",
+    "mode": "build",
+    "prompt": "Create a detail wrangle that computes a global count of points above a height threshold and stores it in an integer detail attribute.",
+    "context": ""
+  },
+  {
+    "id": "build-primitive-mask",
+    "mode": "build",
+    "prompt": "Create a primitive wrangle that assigns a primitive mask based on primitive area and random seed.",
+    "context": ""
+  },
+  {
+    "id": "explain-wrangle-chain",
+    "mode": "explain",
+    "prompt": "Explain the intent and data flow of this wrangle-heavy SOP chain.",
+    "context": "Selected nodes:\n/obj/geo1/attribnoise1\n/obj/geo1/attribwrangle2\n/obj/geo1/color1\n\nNotes:\n- attribnoise1 creates pscale and mask variation\n- attribwrangle2 writes f@mask and offsets @P along @N\n- color1 remaps mask into Cd"
+  },
+  {
+    "id": "debug-missing-curveu",
+    "mode": "debug",
+    "prompt": "Debug why this growth wrangle only affects some curves.",
+    "context": "Node: /obj/geo1/attribwrangle3\nType: Attribute Wrangle (Points)\nGoal: grow mask from root to tip on curves\n\nCode:\nfloat u = f@curveu;\nfloat growth = chf(\"growth\");\nf@mask = smooth(growth - 0.1, growth, u);\n@P += @N * f@mask * chf(\"displace\");\n\nProblem:\n- only some curves react\n- spreadsheet shows curveu missing on several branches"
+  },
+  {
+    "id": "debug-copytopoints",
+    "mode": "debug",
+    "prompt": "Find the most likely issue in this Copy to Points orientation chain.",
+    "context": "Nodes: scatter1 -> attribwrangle1 -> copytopoints1\nExpected attributes: N, up, orient\nProblem: copies flip unpredictably and some pieces point sideways"
+  },
+  {
+    "id": "build-vertex-curve-mask",
+    "mode": "build",
+    "prompt": "Create a vertex wrangle that creates a root-to-tip mask on curves and stores it in f@mask.",
+    "context": ""
+  },
+  {
+    "id": "build-point-curl-displace",
+    "mode": "build",
+    "prompt": "Create a point wrangle that displaces points with curl noise while keeping a clean mask attribute for shading.",
+    "context": ""
+  }
+]

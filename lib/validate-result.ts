@@ -1,16 +1,41 @@
-import type { VexResult } from "@/lib/types";
+import type { Readiness, VexResult } from "@/lib/types";
 import { extractChannelRefs, findSuspiciousVexTokens } from "@/lib/vex";
 
-export function validateVexResult(result: VexResult): string[] {
+export interface ValidationReport {
+  notes: string[];
+  hardFailures: string[];
+  readiness: Readiness;
+}
+
+function isHardFailure(note: string) {
+  return (
+    note.includes("No VEX code was returned.") ||
+    note.includes("Suspicious non-VEX tokens") ||
+    note.includes("No chf/chi/chb controls") ||
+    note.includes('is used in VEX but missing from the slider list') ||
+    note.includes('is declared but not used in the VEX body') ||
+    note.includes('but that token is not clearly written in the VEX body')
+  );
+}
+
+export function getValidationReport(result: VexResult): ValidationReport {
   if (result.response_kind === "analysis") {
-    return ["Analysis mode can be judged for relevance, but not runtime-validated as VEX."];
+    return {
+      notes: [],
+      hardFailures: [],
+      readiness: result.source === "heuristic" ? "fallback" : "ready",
+    };
   }
 
   const notes: string[] = [];
   const code = result.vex_code.trim();
 
   if (!code) {
-    return ["No VEX code was returned."];
+    return {
+      notes: ["No VEX code was returned."],
+      hardFailures: ["No VEX code was returned."],
+      readiness: result.source === "heuristic" ? "fallback" : "needs_review",
+    };
   }
 
   const suspiciousTokens = findSuspiciousVexTokens(code);
@@ -64,5 +89,21 @@ export function validateVexResult(result: VexResult): string[] {
     notes.push(`Output says "${result.output_attribute}" but that token is not clearly written in the VEX body.`);
   }
 
-  return notes;
+  const hardFailures = notes.filter(isHardFailure);
+  const readiness: Readiness = result.source === "heuristic" ? "fallback" : notes.length === 0 ? "ready" : "needs_review";
+
+  return { notes, hardFailures, readiness };
+}
+
+export function validateVexResult(result: VexResult) {
+  return getValidationReport(result).notes;
+}
+
+export function applyValidationReport(result: VexResult): VexResult {
+  const report = getValidationReport(result);
+  return {
+    ...result,
+    validation_notes: report.notes,
+    readiness: report.readiness,
+  };
 }

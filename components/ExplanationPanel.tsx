@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import type { VexResult } from "@/lib/types";
 import { validateVexResult } from "@/lib/validate-result";
+import { prettyReadiness } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -31,7 +32,9 @@ export function ExplanationPanel({ result }: { result: VexResult | null }) {
             <div className="flex items-center gap-2">
               <Badge>{result.source === "model" ? "AI" : "Heuristic"}</Badge>
               <Badge variant="secondary">{result.output_attribute}</Badge>
+              <Badge variant={result.readiness === "ready" ? "secondary" : "outline"}>{prettyReadiness(result.readiness)}</Badge>
               {result.model_used ? <Badge variant="outline">{result.model_used}</Badge> : null}
+              {result.repair_attempted ? <Badge variant="outline">Repair pass</Badge> : null}
             </div>
             <p className="mt-4 text-sm leading-7 text-zinc-200">{result.explanation}</p>
             <Separator className="my-4" />

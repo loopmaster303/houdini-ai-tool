@@ -5,7 +5,8 @@ import { codeToHtml } from "shiki";
 import { Check, Copy } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ParamMap, VexResult } from "@/lib/types";
-import { buildDisplayCode } from "@/lib/utils";
+import { buildDisplayCode, prettyReadiness } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -61,11 +62,15 @@ export function CodePanel({ prompt, result, params }: CodePanelProps) {
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle>{result?.response_kind === "analysis" ? "Generated Analysis" : "Generated VEX"}</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle>{result?.response_kind === "analysis" ? "Generated Analysis" : "Wrangle Output"}</CardTitle>
+              {result ? <Badge variant={result.readiness === "ready" ? "secondary" : "outline"}>{prettyReadiness(result.readiness)}</Badge> : null}
+              {result?.repair_attempted ? <Badge variant="outline">Repair pass</Badge> : null}
+            </div>
             <CardDescription>
               {result?.response_kind === "analysis"
                 ? "Copy the analysis text directly into notes or a handoff."
-                : "Slider changes only rewrite the header comment block."}
+                : "Code-first output for copy/paste into an Attribute Wrangle. Controls are derived, not guaranteed."}
             </CardDescription>
           </div>
           <Button

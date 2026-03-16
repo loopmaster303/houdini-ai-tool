@@ -7,7 +7,7 @@ Core loop:
 - prompt in
 - Pollinations model chain or local heuristic fallback
 - Houdini-ready VEX or Houdini-focused analysis out
-- extracted artist controls as sliders when the task is code generation
+- derived controls when the task is code generation
 
 ## Stack
 
@@ -56,6 +56,7 @@ You can also connect a Pollinations key directly in the browser:
 
 - `POST /api/generate` accepts `{ prompt, context, mode, preferredModel }`
 - model output is normalized into a typed `VexResult`
+- build mode uses mode-specific prompts, static validation, one repair retry, then heuristic fallback
 - slider changes update only the VEX header comment
 - copied code is ready to paste into a Houdini Attribute Wrangle
 
@@ -70,9 +71,12 @@ Testing without Houdini:
 - the app runs static plausibility checks on each result
 - it flags obvious issues such as suspicious non-VEX tokens, missing `ch()` controls, slider/code mismatches, likely wrong wrangle class, or unsafe `curveu` assumptions
 - this is not a real Houdini cook, but it is a useful first filter before artist review
+- `npm run smoke`
+- optional: `npm run smoke -- --model=qwen-coder`
+- optional: `npm run smoke -- --mode=build`
 
 ## Notes
 
 - The heuristic fallback is ported from the original spike logic and templates.
-- The system prompt lives in `prompts/system.md`.
+- Prompt templates now live in `prompts/base.md`, `prompts/build.md`, `prompts/explain.md`, `prompts/debug.md`, and `prompts/repair.md`.
 - The route never returns an empty model failure; it falls back to heuristic output when possible.

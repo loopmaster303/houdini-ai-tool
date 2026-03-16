@@ -12,16 +12,41 @@ interface ParamsPanelProps {
 }
 
 export function ParamsPanel({ result, params, onParamChange }: ParamsPanelProps) {
+  const showFullControls =
+    result?.response_kind === "code" &&
+    result.readiness === "ready" &&
+    result.parameters.length > 0 &&
+    (result.validation_notes?.length ?? 0) === 0;
+
   return (
     <Card className="h-full">
       <CardHeader>
-        <CardTitle>Parameters</CardTitle>
-        <CardDescription>Artist-facing controls extracted from the generated setup.</CardDescription>
+        <CardTitle>Detected Controls</CardTitle>
+        <CardDescription>Derived from the generated VEX. Helpful when clean, secondary when not.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {!result || result.parameters.length === 0 ? (
           <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-950/60 p-6 text-sm text-zinc-500">
             Generate something first.
+          </div>
+        ) : !showFullControls ? (
+          <div className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-950/60 p-5">
+            <p className="text-sm text-zinc-300">
+              The output is not fully ready yet, so controls stay compact instead of taking over the workflow.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {result.parameters.map((parameter) => (
+                <span
+                  key={parameter.name}
+                  className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300"
+                >
+                  {parameter.label}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs leading-5 text-zinc-500">
+              Focus on copy-paste readiness first. Full sliders appear only when the code passes clean static checks.
+            </p>
           </div>
         ) : (
           result.parameters.map((parameter) => {
@@ -73,4 +98,3 @@ export function ParamsPanel({ result, params, onParamChange }: ParamsPanelProps)
     </Card>
   );
 }
-
