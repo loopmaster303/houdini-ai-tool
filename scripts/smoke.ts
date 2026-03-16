@@ -63,6 +63,7 @@ async function main() {
     console.log(`=== ${entry.id} ===`);
     console.log(`mode: ${entry.mode}`);
     console.log(`source: ${result.source}`);
+    console.log(`provider: ${result.provider_status ?? "-"}`);
     console.log(`model: ${result.model_used ?? "-"}`);
     console.log(`readiness: ${result.readiness}`);
     console.log(`repair: ${result.repair_attempted ? "yes" : "no"}`);

@@ -5,6 +5,7 @@ export type ParameterValue = number | boolean;
 export type TaskMode = "build" | "explain" | "debug";
 export type ResponseKind = "code" | "analysis";
 export type Readiness = "ready" | "needs_review" | "fallback";
+export type ProviderStatus = "model_ok" | "auth_error" | "model_error" | "heuristic_only";
 
 export interface Parameter {
   name: string;
@@ -33,6 +34,7 @@ export interface VexResult {
   validation_notes?: string[];
   readiness?: Readiness;
   repair_attempted?: boolean;
+  provider_status?: ProviderStatus;
 }
 
 export type ParamMap = Record<string, ParameterValue>;

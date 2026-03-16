@@ -2,7 +2,7 @@ import { generateHeuristicModeResult } from "@/lib/heuristic";
 import { normalizeModelResult } from "@/lib/normalize";
 import { callPollinations } from "@/lib/pollinations";
 import { applyValidationReport } from "@/lib/validate-result";
-import type { TaskMode, VexResult } from "@/lib/types";
+import type { ProviderStatus, TaskMode, VexResult } from "@/lib/types";
 
 export interface GenerateInput {
   prompt: string;
@@ -12,9 +12,10 @@ export interface GenerateInput {
   apiKey?: string;
 }
 
-function finalize(result: VexResult, repairAttempted = false) {
+function finalize(result: VexResult, providerStatus: ProviderStatus, repairAttempted = false) {
   return applyValidationReport({
     ...result,
+    provider_status: providerStatus,
     repair_attempted: repairAttempted,
   });
 }
@@ -33,22 +34,27 @@ export async function generateResult(input: GenerateInput): Promise<VexResult> {
         prompt,
         context,
         "No Pollinations key is connected, so the app is using the local heuristic generator."
-      )
+      ),
+      "heuristic_only"
     );
   }
 
   try {
     const response = await callPollinations(prompt, context, mode, apiKey, preferredModel);
-    return finalize(normalizeModelResult(response.raw, prompt, mode, context, response.modelUsed), response.repairAttempted);
+    return finalize(normalizeModelResult(response.raw, prompt, mode, context, response.modelUsed), "model_ok", response.repairAttempted);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown model error.";
+    const isAuthError = message.includes("401") || message.includes("403") || message.toUpperCase().includes("UNAUTHORIZED");
     return finalize(
       generateHeuristicModeResult(
         mode,
         prompt,
         context,
-        `Pollinations failed, so the app fell back to the local heuristic generator. ${message}`
-      )
+        isAuthError
+          ? "Pollinations API key is invalid or expired for generation. Reconnect in the key panel above."
+          : `Pollinations failed, so the app fell back to the local heuristic generator. ${message}`
+      ),
+      isAuthError ? "auth_error" : "model_error"
     );
   }
 }

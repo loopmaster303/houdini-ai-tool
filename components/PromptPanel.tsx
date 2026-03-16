@@ -4,7 +4,7 @@ import { Sparkles } from "lucide-react";
 import { PollenKeyPanel } from "@/components/PollenKeyPanel";
 import { DEFAULT_MODEL_ID, RECOMMENDED_MODEL_OPTIONS } from "@/lib/model-options";
 import type { TaskMode, VexResult } from "@/lib/types";
-import { prettyClass, prettyLabel, prettyMode, prettyReadiness } from "@/lib/utils";
+import { prettyClass, prettyLabel, prettyMode, prettyProviderStatus, prettyReadiness } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -169,7 +169,7 @@ export function PromptPanel({
 
         <Separator />
 
-        <PollenKeyPanel />
+        <PollenKeyPanel latestProviderStatus={result?.provider_status} />
 
         <Separator />
 
@@ -181,6 +181,7 @@ export function PromptPanel({
               {result.response_kind === "code" ? <Badge>{prettyLabel(result.intent)}</Badge> : null}
               <Badge variant="secondary">{prettyClass(result.class)}</Badge>
               <Badge variant="outline">{result.output_attribute}</Badge>
+              {result.provider_status ? <Badge variant={result.provider_status === "model_ok" ? "secondary" : "outline"}>{prettyProviderStatus(result.provider_status)}</Badge> : null}
               <Badge variant={result.readiness === "ready" ? "secondary" : "outline"}>{prettyReadiness(result.readiness)}</Badge>
               {result.model_used ? <Badge variant="secondary">{result.model_used}</Badge> : null}
               {result.repair_attempted ? <Badge variant="outline">Repair pass</Badge> : null}

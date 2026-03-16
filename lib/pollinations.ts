@@ -47,47 +47,57 @@ function extractJsonObject(text: string) {
 }
 
 async function requestModelText(systemPrompt: string, userContent: string, apiKey: string, model: string) {
-  const response = await fetch("https://gen.pollinations.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
-      max_tokens: 2000,
-    }),
-    cache: "no-store",
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const response = await fetch("https://gen.pollinations.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+        max_tokens: 2000,
+      }),
+      cache: "no-store",
+      signal: controller.signal,
+    });
 
-  if (!response.ok) {
-    const detail = await response.text();
-    const error = new Error(`Pollinations request failed for ${model}: ${response.status} ${detail}`);
-    (error as Error & { status?: number }).status = response.status;
-    throw error;
+    if (!response.ok) {
+      const detail = await response.text();
+      const error = new Error(`Pollinations request failed for ${model}: ${response.status} ${detail}`);
+      (error as Error & { status?: number }).status = response.status;
+      throw error;
+    }
+
+    const json = (await response.json()) as {
+      choices?: Array<{ message?: { content?: unknown } }>;
+    };
+
+    const content = extractMessageText(json.choices?.[0]?.message?.content);
+    if (!content.trim()) {
+      throw new Error(`Pollinations returned an empty message for ${model}.`);
+    }
+
+    return content;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const json = (await response.json()) as {
-    choices?: Array<{ message?: { content?: unknown } }>;
-  };
-
-  const content = extractMessageText(json.choices?.[0]?.message?.content);
-  if (!content.trim()) {
-    throw new Error(`Pollinations returned an empty message for ${model}.`);
-  }
-
-  return content;
 }
 
 function buildUserContent(prompt: string, context: string, mode: TaskMode) {
+  const normalizedContext =
+    context.trim().length > 8000 ? `${context.trim().slice(0, 8000)}\n...[truncated]` : context.trim();
+
   return [
     `TASK MODE: ${mode}`,
     `USER PROMPT:\n${prompt}`,
-    context.trim() ? `HOUDINI CONTEXT:\n${context.trim()}` : "HOUDINI CONTEXT:\n(none supplied)",
+    normalizedContext ? `HOUDINI CONTEXT:\n${normalizedContext}` : "HOUDINI CONTEXT:\n(none supplied)",
     mode === "build"
       ? [
           "BUILD CHECKLIST:",

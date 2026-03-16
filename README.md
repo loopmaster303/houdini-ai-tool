@@ -7,7 +7,7 @@ Core loop:
 - prompt in
 - Pollinations model chain or local heuristic fallback
 - Houdini-ready VEX or Houdini-focused analysis out
-- derived controls when the task is code generation
+- reference parameters when the task is code generation
 
 ## Stack
 
@@ -50,14 +50,15 @@ You can also connect a Pollinations key directly in the browser:
 
 - `Connect with Pollinations` uses the OAuth redirect flow
 - manual key paste stores the key in local browser storage
-- connected state and balance are checked against Pollinations directly
+- account/balance status is advisory only; generation truth comes from the actual model request
 
 ## Behavior
 
 - `POST /api/generate` accepts `{ prompt, context, mode, preferredModel }`
 - model output is normalized into a typed `VexResult`
 - build mode uses mode-specific prompts, static validation, one repair retry, then heuristic fallback
-- slider changes update only the VEX header comment
+- results expose both `provider_status` and `readiness`
+- the parameter panel is a reference view, not an interactive control surface
 - copied code is ready to paste into a Houdini Attribute Wrangle
 
 Current task modes:

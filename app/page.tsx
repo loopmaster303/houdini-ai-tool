@@ -8,7 +8,7 @@ import { ParamsPanel } from "@/components/ParamsPanel";
 import { PromptPanel } from "@/components/PromptPanel";
 import { DEFAULT_MODEL_ID, RECOMMENDED_MODEL_OPTIONS } from "@/lib/model-options";
 import { getPollenHeaders } from "@/lib/pollen-key";
-import type { ParamMap, ParameterValue, TaskMode, VexResult } from "@/lib/types";
+import type { ParamMap, TaskMode, VexResult } from "@/lib/types";
 import { prettyMode } from "@/lib/utils";
 import { getDefaultParamMap } from "@/lib/utils";
 
@@ -160,6 +160,7 @@ export default function HomePage() {
           explanation: "The request could not be generated.",
           assumptions: message,
           source: "heuristic",
+          provider_status: "model_error",
           readiness: "needs_review",
           repair_attempted: false,
           validation_notes:
@@ -172,13 +173,6 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleParamChange(name: string, value: ParameterValue) {
-    setParams((current) => ({
-      ...current,
-      [name]: value,
-    }));
   }
 
   return (
@@ -222,7 +216,7 @@ export default function HomePage() {
           />
 
           <div className="grid min-h-[640px] grid-rows-[minmax(180px,0.6fr)_minmax(400px,1.4fr)] gap-4">
-            <ParamsPanel result={result} params={params} onParamChange={handleParamChange} />
+            <ParamsPanel result={result} />
             <CodePanel prompt={prompt} result={result} params={params} />
           </div>
 

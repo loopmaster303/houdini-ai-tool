@@ -3,14 +3,33 @@
 import { useState } from "react";
 import { Loader2, LogOut, Zap } from "lucide-react";
 import { usePollenKey } from "@/hooks/usePollenKey";
+import type { ProviderStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
-export function PollenKeyPanel() {
-  const { pollenKey, isConnected, accountInfo, isLoadingAccount, connectOAuth, connectManual, disconnect } = usePollenKey();
+interface PollenKeyPanelProps {
+  latestProviderStatus?: ProviderStatus;
+}
+
+export function PollenKeyPanel({ latestProviderStatus }: PollenKeyPanelProps) {
+  const { pollenKey, accountInfo, isLoadingAccount, accountStatus, connectOAuth, connectManual, disconnect } = usePollenKey();
   const [manualKeyInput, setManualKeyInput] = useState("");
 
   const maskedKey = pollenKey ? `${pollenKey.slice(0, 6)}...${pollenKey.slice(-4)}` : "";
+  const hasKey = !!pollenKey;
+
+  const badgeLabel =
+    !hasKey ? "Not connected" : accountStatus === "checking" ? "Checking..." : accountStatus === "valid" ? "Connected" : accountStatus === "invalid" ? "Balance check failed" : "Account status unknown";
+  const badgeClass =
+    !hasKey
+      ? "border-zinc-700 bg-zinc-800 text-zinc-400"
+      : accountStatus === "valid"
+        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+        : accountStatus === "checking"
+          ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+          : "border-rose-500/30 bg-rose-500/10 text-rose-300";
+  const dotClass =
+    !hasKey ? "bg-zinc-500" : accountStatus === "valid" ? "bg-emerald-400" : accountStatus === "checking" ? "bg-amber-300" : "bg-rose-300";
 
   function handleManualConnect() {
     if (!manualKeyInput.trim()) {
@@ -29,24 +48,30 @@ export function PollenKeyPanel() {
           <p className="mt-1 text-sm text-zinc-300">Connect your own Pollen key or use the server fallback.</p>
         </div>
         <span
-          className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs ${
-            isConnected ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-zinc-700 bg-zinc-800 text-zinc-400"
-          }`}
+          className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs ${badgeClass}`}
         >
-          <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-400" : "bg-zinc-500"}`} />
-          {isConnected ? "Connected" : "Not connected"}
+          <span className={`h-2 w-2 rounded-full ${dotClass}`} />
+          {badgeLabel}
         </span>
       </div>
 
-      {isConnected ? (
+      {hasKey ? (
         <div className="mt-4 space-y-3">
-          <div className="rounded-lg border border-emerald-500/15 bg-emerald-500/5 p-3">
+          <div
+            className={`rounded-lg p-3 ${
+              accountStatus === "valid"
+                ? "border border-emerald-500/15 bg-emerald-500/5"
+                : accountStatus === "checking"
+                  ? "border border-amber-500/15 bg-amber-500/5"
+                  : "border border-zinc-800 bg-zinc-900/60"
+            }`}
+          >
             <div className="flex items-center justify-between gap-3 text-xs text-zinc-400">
               <span>Key</span>
               <span className="font-mono text-zinc-200">{maskedKey}</span>
             </div>
 
-            {isLoadingAccount ? (
+            {isLoadingAccount || accountStatus === "checking" ? (
               <div className="mt-3 flex items-center gap-2 text-xs text-zinc-400">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Checking balance...
@@ -56,9 +81,17 @@ export function PollenKeyPanel() {
                 <span>Balance</span>
                 <span className="font-semibold text-zinc-100">{accountInfo.balance.toLocaleString()} pollen</span>
               </div>
+            ) : accountStatus === "invalid" ? (
+              <div className="mt-3 text-xs text-rose-300">Balance check failed. The saved key may still work for generation, but reconnect if model calls keep failing.</div>
             ) : (
-              <div className="mt-3 text-xs text-zinc-500">Connected, but account balance could not be loaded right now.</div>
+              <div className="mt-3 text-xs text-zinc-500">Account status is advisory only. Generation availability is determined by the actual model request.</div>
             )}
+
+            {latestProviderStatus === "auth_error" ? (
+              <div className="mt-3 rounded-md border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+                Generation auth failed. Reconnect your Pollinations key.
+              </div>
+            ) : null}
           </div>
 
           <Button variant="ghost" className="w-full justify-center text-rose-300 hover:bg-rose-500/10 hover:text-rose-200" onClick={disconnect}>

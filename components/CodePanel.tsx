@@ -5,7 +5,7 @@ import { codeToHtml } from "shiki";
 import { Check, Copy } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ParamMap, VexResult } from "@/lib/types";
-import { buildDisplayCode, prettyReadiness } from "@/lib/utils";
+import { buildDisplayCode, prettyProviderStatus, prettyReadiness } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,6 +64,7 @@ export function CodePanel({ prompt, result, params }: CodePanelProps) {
           <div>
             <div className="flex items-center gap-2">
               <CardTitle>{result?.response_kind === "analysis" ? "Generated Analysis" : "Wrangle Output"}</CardTitle>
+              {result?.provider_status ? <Badge variant={result.provider_status === "model_ok" ? "secondary" : "outline"}>{prettyProviderStatus(result.provider_status)}</Badge> : null}
               {result ? <Badge variant={result.readiness === "ready" ? "secondary" : "outline"}>{prettyReadiness(result.readiness)}</Badge> : null}
               {result?.repair_attempted ? <Badge variant="outline">Repair pass</Badge> : null}
             </div>

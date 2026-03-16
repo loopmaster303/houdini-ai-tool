@@ -1,6 +1,6 @@
 # Context
 
-This repo is for a focused Houdini tool experiment.
+This repo is a focused Houdini AI tool experiment built as a Next.js App Router app.
 
 ## Team
 
@@ -8,74 +8,70 @@ This repo is for a focused Houdini tool experiment.
 - Lukas: Houdini artist/TD, procedural FX, rendering, raymarching/fractals, moving into APEX
 - Codex: builder, planner, drafter, creative technical partner
 
-## Core idea
+## Product truth
 
-Do not build a generic "Houdini assistant" first.
+Do not build a generic Houdini assistant first.
 
 Build the thinnest useful hook:
 
-`prompt -> Houdini-ready VEX -> extracted artist controls`
+`prompt -> copy-pasteable Houdini Wrangle output`
 
-The point is not just code generation.
-The point is turning intent into usable setups.
+The current priority is not broad scene awareness.
+The current priority is code that is believable enough to paste into an Attribute Wrangle, plus a clear explanation of how trustworthy it is.
 
-## Why this direction
+## Current app
 
-- easier to demo
-- easier to validate with real artists
-- more concrete than a broad scene-aware copilot
-- directly useful even before deep Houdini integration
+The working app lives in the Next.js codebase:
 
-## Current spike
+- `app/`
+- `components/`
+- `lib/`
+- `prompts/`
 
-The prototype already lives in:
+Main modes:
 
-- `index.html`
-- `styles.css`
-- `app.js`
-- `server.js`
+- `Build`
+- `Explain`
+- `Debug`
 
-Current behavior:
+## Current generation flow
 
-- user writes a prompt
-- app detects a rough intent
-- app generates a Houdini-flavored wrangle snippet
-- app extracts likely parameters
-- sliders update suggested defaults
+- user submits prompt, optional context, and preferred model
+- app calls Pollinations when a key is available
+- build mode uses mode-specific prompt templates
+- model output is normalized and statically validated
+- one repair pass is attempted for broken build output
+- if model generation fails, app falls back to the local heuristic generator
 
-Known intents right now:
+## Important result concepts
 
-- mask
-- growth
-- wobble
-- color
-- twist
+- `provider_status`
+  model transport/auth health
+  examples: `model_ok`, `auth_error`, `model_error`, `heuristic_only`
 
-## Working principle
+- `readiness`
+  output trust level
+  examples: `ready`, `needs_review`, `fallback`
 
-Prefer building over over-planning.
+- `validation_notes`
+  human-readable structural warnings about the generated VEX
 
-If the thin loop feels useful to Lukas, keep going.
-If it does not, adjust fast.
+## UI reality
 
-## Immediate next step
+- code panel is the main surface
+- parameter panel is reference-only, not a promise of production-ready controls
+- Pollinations account/balance state is advisory only
+- real generation truth comes from the actual model request result
 
-Keep the UI flow, replace the heuristic generator in `app.js` with a real model call.
+## Known limits
 
-Keep the output shape stable:
+- not a Houdini plugin yet
+- no live scene inspection
+- no guaranteed Houdini runtime compile validation from inside this app
+- static validation helps, but cannot fully replace testing in Houdini
 
-- prompt
-- intent
-- params
-- VEX
-- short explanation
+## Near-term direction
 
-## Longer-term direction
-
-Possible later layers, only after the thin core proves itself:
-
-- Houdini panel integration
-- scene-aware context
-- debug/explain modes
-- shader/material modes
-- APEX translation and rig logic assistance
+- improve trust and clarity around generated VEX
+- make fallback/auth/model states obvious in the UI
+- keep tightening copy-paste quality before expanding scope
